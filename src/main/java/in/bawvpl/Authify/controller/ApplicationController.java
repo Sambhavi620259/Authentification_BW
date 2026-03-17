@@ -2,7 +2,10 @@
 package in.bawvpl.Authify.controller;
 
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1.0/application")
