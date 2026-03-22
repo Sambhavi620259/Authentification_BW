@@ -1,8 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="
-           http://maven.apache.org/POM/4.0.0
-           http://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 	<modelVersion>4.0.0</modelVersion>
 
@@ -60,10 +59,11 @@
 			<version>3.3.3</version>
 		</dependency>
 
-		<!-- Lombok -->
+		<!-- Lombok (FIXED) -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<version>1.18.30</version>
 			<scope>provided</scope>
 		</dependency>
 
@@ -86,7 +86,7 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- Tests (not used but required by Spring Boot) -->
+		<!-- Tests -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -98,17 +98,24 @@
 	<build>
 		<plugins>
 
-			<!-- Compiler -->
+			<!-- 🔥 IMPORTANT: Lombok Annotation Processing FIX -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.11.0</version>
 				<configuration>
 					<release>17</release>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>1.18.30</version>
+						</path>
+					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
 
-			<!-- Skip Tests (Fix Build Failure) -->
+			<!-- Skip Tests -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
@@ -118,7 +125,7 @@
 				</configuration>
 			</plugin>
 
-			<!-- Spring Boot Plugin -->
+			<!-- Spring Boot -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
