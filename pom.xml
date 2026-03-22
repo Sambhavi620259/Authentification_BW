@@ -9,11 +9,13 @@
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>3.2.4</version>
+		<relativePath/>
 	</parent>
 
 	<groupId>in.bawvpl</groupId>
 	<artifactId>Authify</artifactId>
 	<version>1.0.0</version>
+	<name>Authify</name>
 
 	<properties>
 		<java.version>17</java.version>
@@ -59,11 +61,11 @@
 			<version>3.3.3</version>
 		</dependency>
 
-		<!-- Lombok (FIXED) -->
+		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<version>1.18.30</version>
+			<version>1.18.32</version>
 			<scope>provided</scope>
 		</dependency>
 
@@ -98,7 +100,7 @@
 	<build>
 		<plugins>
 
-			<!-- 🔥 IMPORTANT: Lombok Annotation Processing FIX -->
+			<!-- Compiler -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -109,13 +111,13 @@
 						<path>
 							<groupId>org.projectlombok</groupId>
 							<artifactId>lombok</artifactId>
-							<version>1.18.30</version>
+							<version>1.18.32</version>
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
 
-			<!-- Skip Tests -->
+			<!-- Skip tests -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
