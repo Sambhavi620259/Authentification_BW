@@ -4,25 +4,24 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class CartItem {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;
 
-    private String userId;        // <-- Matches your backend logic
     private String productId;
     private String productName;
-
     private double price;
     private int quantity;
 
-    // IMPORTANT FIX
+    private String userId;
+
+    // ✅ IMPORTANT FIX (must match Cart)
     @ManyToOne
     @JoinColumn(name = "cart_id")
     private Cart cart;

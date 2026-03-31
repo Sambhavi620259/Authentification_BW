@@ -1,8 +1,15 @@
 package in.bawvpl.Authify.service;
 
-import java.time.Instant;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
+import in.bawvpl.Authify.entity.KycEntity;
+import in.bawvpl.Authify.entity.UserEntity;
+import in.bawvpl.Authify.io.ProfileRequest;
+import in.bawvpl.Authify.io.ProfileResponse;
+import in.bawvpl.Authify.repository.KycRepository;
+import in.bawvpl.Authify.repository.UserRepository;
+import in.bawvpl.Authify.util.JwtUtil;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -10,13 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
-import in.bawvpl.Authify.entity.UserEntity;
-import in.bawvpl.Authify.io.ProfileRequest;
-import in.bawvpl.Authify.io.ProfileResponse;
-import in.bawvpl.Authify.repository.UserRepository;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -27,11 +30,13 @@ public class ProfileServiceImpl implements ProfileService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final SmsService smsService;
+    private final KycRepository kycRepository;
+    private final JwtUtil jwtUtil;
 
-    private static final long RESET_OTP_TTL_SECONDS = 15 * 60; // 15 minutes
-    private static final long VERIFY_OTP_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+    private static final long VERIFY_OTP_TTL_SECONDS = 5 * 60;
+    private static final long RESET_OTP_TTL_SECONDS = 15 * 60;
 
-    // ---------------- CREATE PROFILE ----------------
+    // ================= REGISTER =================
     @Override
     @Transactional
     public ProfileResponse createProfile(ProfileRequest request) {
@@ -41,90 +46,60 @@ public class ProfileServiceImpl implements ProfileService {
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already exists");
         }
 
-        UserEntity user = convertToUserEntity(request);
-        user = userRepository.save(user);
+        String userId = UUID.randomUUID().toString();
 
-        return convertToProfileResponse(user);
-    }
+        UserEntity user = UserEntity.builder()
+                .userId(userId)
+                .name(request.getName())
+                .email(request.getEmail())
+                .phoneNumber(request.getPhoneNumber())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role("USER")
+                .isAccountVerified(false)
+                .isKycVerified(false)
+                .build();
 
-    // ---------------- GET PROFILE ----------------
-    @Override
-    public ProfileResponse getProfile(String email) {
-        UserEntity user = findByEmailOrThrow(email);
-        return convertToProfileResponse(user);
-    }
-
-    // ---------------- SEND RESET PASSWORD OTP ----------------
-    @Override
-    @Transactional
-    public void sendResetOtp(String email) {
-
-        UserEntity user = findByEmailOrThrow(email);
-
-        String otp = generateOtp();
-        long expireAt = Instant.now().plusSeconds(RESET_OTP_TTL_SECONDS).toEpochMilli();
-
-        user.setResetOtp(otp);
-        user.setResetOtpExpireAt(expireAt);
-        userRepository.save(user);
-
-        emailService.sendResetOtpEmail(email, otp);
-    }
-
-    // ---------------- RESET PASSWORD ----------------
-    @Override
-    @Transactional
-    public void resetPassword(String email, String otp, String newPassword) {
-
-        UserEntity user = findByEmailOrThrow(email);
-
-        if (user.getResetOtp() == null || !user.getResetOtp().equals(otp)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OTP");
-        }
-
-        if (user.getResetOtpExpireAt() == null ||
-                Instant.now().toEpochMilli() > user.getResetOtpExpireAt()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP expired");
-        }
-
-        user.setPassword(passwordEncoder.encode(newPassword));
-        user.setResetOtp(null);
-        user.setResetOtpExpireAt(null);
-        userRepository.save(user);
-    }
-
-    // ---------------- SEND ACCOUNT VERIFICATION OTP ----------------
-    @Override
-    @Transactional
-    public void sendVerificationOtp(String email) {
-
-        UserEntity user = findByEmailOrThrow(email);
-
-        if (Boolean.TRUE.equals(user.getIsAccountVerified())) {
-            return; // already verified
-        }
-
+        // 🔥 GENERATE OTP
         String otp = generateOtp();
         long expireAt = Instant.now().plusSeconds(VERIFY_OTP_TTL_SECONDS).toEpochMilli();
 
         user.setVerifyOtp(otp);
         user.setVerifyOtpExpireAt(expireAt);
+
         userRepository.save(user);
 
-        emailService.sendVerificationOtpEmail(email, otp);
+        // 🔥 SEND OTP
+        emailService.sendVerificationOtpEmail(user.getEmail(), otp);
+
+        // 🔥 SAVE KYC IF PROVIDED
+        if (request.getAadhaarNumber() != null && request.getPanNumber() != null) {
+
+            KycEntity kyc = KycEntity.builder()
+                    .user(user)
+                    .aadhaarNumber(request.getAadhaarNumber())
+                    .panNumber(request.getPanNumber())
+                    .status("PENDING")
+                    .completed(false)
+                    .uploadedAt(Instant.now())
+                    .build();
+
+            kycRepository.save(kyc);
+        }
+
+        return convertToProfileResponse(user);
     }
 
-    // ---------------- VERIFY ACCOUNT OTP ----------------
+    // ================= VERIFY OTP =================
     @Override
     @Transactional
-    public void verifyOtp(String email, String otp) {
+    public String verifyOtp(String email, String otp) {
 
         UserEntity user = findByEmailOrThrow(email);
 
-        if (user.getVerifyOtp() == null || !user.getVerifyOtp().equals(otp)) {
+        if (user.getVerifyOtp() == null || !otp.equals(user.getVerifyOtp())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OTP");
         }
 
@@ -138,55 +113,100 @@ public class ProfileServiceImpl implements ProfileService {
         user.setVerifyOtpExpireAt(null);
 
         userRepository.save(user);
+
+        // 🔥 RETURN JWT TOKEN
+        return jwtUtil.generateToken(user.getEmail());
     }
 
-    // ---------------- VERIFY KYC ----------------
+    // ================= SEND VERIFICATION OTP =================
+    @Override
+    public void sendVerificationOtp(String email) {
+
+        UserEntity user = findByEmailOrThrow(email);
+
+        String otp = generateOtp();
+        long expireAt = Instant.now().plusSeconds(VERIFY_OTP_TTL_SECONDS).toEpochMilli();
+
+        user.setVerifyOtp(otp);
+        user.setVerifyOtpExpireAt(expireAt);
+
+        userRepository.save(user);
+
+        emailService.sendVerificationOtpEmail(email, otp);
+    }
+
+    // ================= RESET OTP =================
+    @Override
+    public void sendResetOtp(String email) {
+
+        UserEntity user = findByEmailOrThrow(email);
+
+        String otp = generateOtp();
+        long expireAt = Instant.now().plusSeconds(RESET_OTP_TTL_SECONDS).toEpochMilli();
+
+        user.setResetOtp(otp);
+        user.setResetOtpExpireAt(expireAt);
+
+        userRepository.save(user);
+
+        emailService.sendResetOtpEmail(email, otp);
+    }
+
+    // ================= RESET PASSWORD =================
     @Override
     @Transactional
-    public void verifyKyc(String email) {
+    public void resetPassword(String email, String otp, String newPassword) {
+
         UserEntity user = findByEmailOrThrow(email);
-        user.setIsKycVerified(true);
+
+        if (user.getResetOtp() == null || !otp.equals(user.getResetOtp())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OTP");
+        }
+
+        if (user.getResetOtpExpireAt() == null ||
+                Instant.now().toEpochMilli() > user.getResetOtpExpireAt()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP expired");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetOtp(null);
+        user.setResetOtpExpireAt(null);
+
         userRepository.save(user);
     }
 
-    // ---------------- GET LOGGED-IN USER ID ----------------
+    // ================= GET PROFILE =================
     @Override
-    public String getLoggedInUserId(String email) {
+    public ProfileResponse getProfile(String email) {
+        UserEntity user = findByEmailOrThrow(email);
+        return convertToProfileResponse(user);
+    }
+
+    // ================= VERIFY KYC =================
+    @Override
+    @Transactional
+    public void verifyKyc(String email) {
+
+        UserEntity user = findByEmailOrThrow(email);
+
+        user.setIsKycVerified(true);
+
+        userRepository.save(user);
+    }
+
+    // ================= HELPERS =================
+
+    private UserEntity findByEmailOrThrow(String email) {
         return userRepository.findByEmail(email)
-                .map(UserEntity::getUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
-    // ---------------- SAVE USER ----------------
-    @Override
-    public UserEntity save(UserEntity userEntity) {
-        return userRepository.save(userEntity);
-    }
-
-    // ---------------- EXISTS BY EMAIL ----------------
-    @Override
-    public boolean existsByEmail(String email) {
-        return userRepository.existsByEmail(email);
-    }
-
-    // ---------------- FIND BY EMAIL ----------------
-    @Override
-    public UserEntity findByEmail(String email) {
-        return findByEmailOrThrow(email);
-    }
-
-    // ---------------- INTERNAL UTILS ----------------
-    private UserEntity findByEmailOrThrow(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found: " + email));
-    }
-
     private String generateOtp() {
-        return String.valueOf(ThreadLocalRandom.current().nextInt(100_000, 1_000_000));
+        return String.valueOf(ThreadLocalRandom.current().nextInt(100000, 999999));
     }
 
     private ProfileResponse convertToProfileResponse(UserEntity user) {
+
         return ProfileResponse.builder()
                 .userId(user.getUserId())
                 .name(user.getName())
@@ -197,19 +217,25 @@ public class ProfileServiceImpl implements ProfileService {
                 .build();
     }
 
-    private UserEntity convertToUserEntity(ProfileRequest req) {
-        return UserEntity.builder()
-                .userId(UUID.randomUUID().toString())
-                .name(req.getName())
-                .email(req.getEmail())
-                .phoneNumber(req.getPhoneNumber())
-                .password(passwordEncoder.encode(req.getPassword()))
-                .isAccountVerified(false)
-                .isKycVerified(false)
-                .verifyOtp(null)
-                .verifyOtpExpireAt(null)
-                .resetOtp(null)
-                .resetOtpExpireAt(null)
-                .build();
+    // ================= EXTRA METHODS =================
+
+    @Override
+    public String getLoggedInUserId(String email) {
+        return findByEmailOrThrow(email).getUserId();
+    }
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+    @Override
+    public UserEntity findByEmail(String email) {
+        return findByEmailOrThrow(email);
+    }
+
+    @Override
+    public UserEntity save(UserEntity userEntity) {
+        return userRepository.save(userEntity);
     }
 }

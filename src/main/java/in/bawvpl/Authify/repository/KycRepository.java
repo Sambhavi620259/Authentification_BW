@@ -6,5 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface KycRepository extends JpaRepository<KycEntity, Long> {
-    List<KycEntity> findByUserId(String userId);
+
+    // ✅ FIX: use user object, NOT String
+    List<KycEntity> findByUser_UserId(String userId);
 }

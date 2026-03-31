@@ -8,6 +8,8 @@ public interface ProfileService {
 
     ProfileResponse createProfile(ProfileRequest request);
 
+    String verifyOtp(String email, String otp); // ✅ FIXED
+
     ProfileResponse getProfile(String email);
 
     void sendResetOtp(String email);
@@ -15,8 +17,6 @@ public interface ProfileService {
     void resetPassword(String email, String otp, String newPassword);
 
     void sendVerificationOtp(String email);
-
-    void verifyOtp(String email, String otp);
 
     void verifyKyc(String email);
 

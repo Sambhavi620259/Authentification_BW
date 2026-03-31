@@ -9,5 +9,7 @@ public class ProfileRequest {
     private String name;
     private String email;
     private String password;
-    private String phoneNumber; // optional but accepted
+    private String phoneNumber;
+    private String aadhaarNumber;
+    private String panNumber;// optional but accepted
 }

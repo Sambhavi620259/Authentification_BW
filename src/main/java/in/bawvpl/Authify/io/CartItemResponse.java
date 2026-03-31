@@ -1,15 +1,12 @@
 package in.bawvpl.Authify.io;
 
-import lombok.*;
+import lombok.Builder;
+import lombok.Data;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Data
 @Builder
 public class CartItemResponse {
-
-    private Long id;
+    private String id;
     private String userId;
     private String productId;
     private String productName;

@@ -31,27 +31,28 @@ public class UserEntity {
 
     private String role;
 
-    private Boolean isAccountVerified;
+    private Boolean isAccountVerified = false;
+    private Boolean isKycVerified = false;
 
-    private Boolean isKycVerified;
-
-    // Login OTP
+    // ✅ OTP FIELDS (FIXED)
     private String verifyOtp;
     private Long verifyOtpExpireAt;
 
-    // Register OTP
+    private String resetOtp;
+    private Long resetOtpExpireAt;
+
     private String registerOtp;
     private Long registerOtpExpireAt;
 
-    // Reset Password OTP
-    private String resetOtp;
-    private Long resetOtpExpireAt;
+    // ✅ KYC RELATION
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private KycEntity kyc;
 
     @Column(updatable = false)
     private Long createdAt;
 
     @PrePersist
     public void onCreate() {
-        createdAt = Instant.now().toEpochMilli();
+        this.createdAt = Instant.now().toEpochMilli();
     }
 }

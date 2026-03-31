@@ -25,28 +25,37 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                // ✅ CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // ✅ Disable CSRF for APIs
                 .csrf(csrf -> csrf.disable())
 
+                // ✅ Stateless (JWT)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
+                // ✅ Authorization rules
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ allow preflight (VERY IMPORTANT)
+                        // ✅ allow OPTIONS (preflight)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ public endpoints
+                        // ✅ PUBLIC APIs (FIXED PATHS)
                         .requestMatchers(
                                 "/",
                                 "/error",
-                                "/favicon.ico",   // ✅ FIX 403
-                                "/api/v1.0/register",
-                                "/api/v1.0/login",
-                                "/api/v1.0/login/verify-otp",
-                                "/api/v1.0/send-otp",
-                                "/api/v1.0/send-reset-otp",
-                                "/api/v1.0/reset-password",
+                                "/favicon.ico",
+
+                                // 🔥 PROFILE APIs (MATCH YOUR CONTROLLER)
+                                "/api/v1/profile/register",
+                                "/api/v1/profile/login",
+                                "/api/v1/profile/verify-otp",
+                                "/api/v1/profile/send-otp",
+                                "/api/v1/profile/send-reset-otp",
+                                "/api/v1/profile/reset-password",
+
+                                // Swagger
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
@@ -55,6 +64,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
+                // ✅ JWT filter
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -65,12 +75,12 @@ public class SecurityConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of("*")); // allow all (public API)
+        config.setAllowedOrigins(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
 
-        // ✅ expose auth header (important for frontend)
+        // expose Authorization header
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

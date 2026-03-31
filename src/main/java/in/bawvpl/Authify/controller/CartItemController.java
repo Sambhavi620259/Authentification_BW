@@ -3,23 +3,25 @@ package in.bawvpl.Authify.controller;
 import in.bawvpl.Authify.io.CartItemRequest;
 import in.bawvpl.Authify.io.CartItemResponse;
 import in.bawvpl.Authify.service.CartItemService;
-import in.bawvpl.Authify.service.CartItemService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/v1.0/cart")
+@RequestMapping("/api/v1/cart")
 public class CartItemController {
 
     private final CartItemService cartService;
 
-    // Add item
-    @PostMapping("/{userId}/add")
+    // ✅ Manual constructor (fixes your error)
+    public CartItemController(CartItemService cartService) {
+        this.cartService = cartService;
+    }
+
+    // ✅ Add item
+    @PostMapping("/{userId}/items")
     public ResponseEntity<CartItemResponse> addItem(
             @PathVariable String userId,
             @Valid @RequestBody CartItemRequest req) {
@@ -27,14 +29,16 @@ public class CartItemController {
         return ResponseEntity.ok(cartService.addItem(userId, req));
     }
 
-    // Get items
-    @GetMapping("/{userId}")
-    public ResponseEntity<List<CartItemResponse>> getItems(@PathVariable String userId) {
+    // ✅ Get items
+    @GetMapping("/{userId}/items")
+    public ResponseEntity<List<CartItemResponse>> getItems(
+            @PathVariable String userId) {
+
         return ResponseEntity.ok(cartService.getItemsForUser(userId));
     }
 
-    // Remove item
-    @DeleteMapping("/{userId}/{productId}/delete")
+    // ✅ Remove item
+    @DeleteMapping("/{userId}/items/{productId}")
     public ResponseEntity<Void> removeItem(
             @PathVariable String userId,
             @PathVariable String productId) {
