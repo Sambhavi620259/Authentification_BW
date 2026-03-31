@@ -42,7 +42,6 @@ public class AppUserDetailsService implements UserDetailsService {
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User not found: " + username));
 
-        // ✅ Always guarantee ROLE_USER
         String role = user.getRole();
         if (role == null || role.isBlank()) {
             role = "ROLE_USER";
@@ -72,7 +71,7 @@ public class AppUserDetailsService implements UserDetailsService {
                 .email(req.getEmail())
                 .phoneNumber(req.getPhoneNumber())
                 .password(passwordEncoder.encode(req.getPassword()))
-                .role("ROLE_USER") // ✅ explicit
+                .role("ROLE_USER")
                 .isAccountVerified(false)
                 .isKycVerified(false)
                 .build();
@@ -97,15 +96,20 @@ public class AppUserDetailsService implements UserDetailsService {
                     HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
+        // 🔥 GENERATE OTP (SAVES IN DB)
         String otp = otpService.generateLoginOtp(user);
 
+        // 🔥 LOG FOR DEBUG
+        log.info("LOGIN OTP GENERATED: {}", otp);
+
+        // 🔥 SEND EMAIL (DO NOT BREAK FLOW)
         try {
             emailService.sendVerificationOtpEmail(user.getEmail(), otp);
-            return true;
         } catch (Exception ex) {
-            log.error("Failed to send OTP email", ex);
-            return false;
+            log.error("Email failed, but OTP is saved in DB", ex);
         }
+
+        return true;
     }
 
     // ===============================
@@ -121,7 +125,6 @@ public class AppUserDetailsService implements UserDetailsService {
 
         otpService.verifyLoginOtp(user, otp);
 
-        // ✅ Generate JWT after OTP success
         String accessToken = jwtUtil.generateAccessToken(user.getEmail());
 
         return AuthResponse.builder()
