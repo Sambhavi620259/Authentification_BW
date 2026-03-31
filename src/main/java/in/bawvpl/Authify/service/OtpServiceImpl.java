@@ -1,7 +1,8 @@
 package in.bawvpl.Authify.service;
 
+import in.bawvpl.Authify.entity.OtpVerification;
 import in.bawvpl.Authify.entity.UserEntity;
-import in.bawvpl.Authify.repository.UserRepository;
+import in.bawvpl.Authify.repository.OtpRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -17,9 +18,9 @@ import java.util.concurrent.ThreadLocalRandom;
 @Slf4j
 public class OtpServiceImpl implements OtpService {
 
-    private final UserRepository userRepository;
+    private final OtpRepository otpRepository;
 
-    private static final long LOGIN_OTP_EXPIRY_SECONDS = 5 * 60; // 5 minutes
+    private static final int LOGIN_OTP_EXPIRY_MINUTES = 5;
 
     // -----------------------
     // GENERAL OTP GENERATOR
@@ -35,13 +36,24 @@ public class OtpServiceImpl implements OtpService {
     @Override
     @Transactional
     public String generateLoginOtp(UserEntity user) {
+
+        // 1. Generate OTP
         String otp = generateOtp();
-        long expiry = Instant.now().plusSeconds(LOGIN_OTP_EXPIRY_SECONDS).toEpochMilli();
 
-        user.setVerifyOtp(otp);
-        user.setVerifyOtpExpireAt(expiry);
+        // 2. Create OTP entity
+        OtpVerification otpEntity = new OtpVerification();
+        otpEntity.setUserId(user.getId());
+        otpEntity.setEmail(user.getEmail());
+        otpEntity.setPhoneNumber(user.getPhoneNumber());
+        otpEntity.setOtp(otp);
+        otpEntity.setPurpose("LOGIN");
+        otpEntity.setExpiryTime(LocalDateTime.now().plusMinutes(LOGIN_OTP_EXPIRY_MINUTES));
+        otpEntity.setIsUsed(false);
 
-        userRepository.save(user);
+        // 3. Save OTP in DB
+        otpRepository.save(otpEntity);
+
+        // 4. Log for debugging
         log.info("Login OTP generated for {} => {}", user.getEmail(), otp);
 
         return otp;
@@ -54,21 +66,30 @@ public class OtpServiceImpl implements OtpService {
     @Transactional
     public void verifyLoginOtp(UserEntity user, String otp) {
 
-        if (user.getVerifyOtp() == null || !user.getVerifyOtp().equals(otp)) {
+        // 1. Fetch latest OTP
+        OtpVerification otpEntity = otpRepository
+                .findTopByEmailAndPurposeOrderByCreatedAtDesc(user.getEmail(), "LOGIN")
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP not found"));
+
+        // 2. Validate OTP
+        if (!otpEntity.getOtp().equals(otp)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OTP");
         }
 
-        if (user.getVerifyOtpExpireAt() == null ||
-                Instant.now().toEpochMilli() > user.getVerifyOtpExpireAt()) {
+        // 3. Check expiry
+        if (otpEntity.getExpiryTime().isBefore(LocalDateTime.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP expired");
         }
 
-        // OTP is valid → clear it
-        user.setVerifyOtp(null);
-        user.setVerifyOtpExpireAt(null);
-        userRepository.save(user);
+        // 4. Check already used
+        if (Boolean.TRUE.equals(otpEntity.getIsUsed())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP already used");
+        }
+
+        // 5. Mark as used
+        otpEntity.setIsUsed(true);
+        otpRepository.save(otpEntity);
 
         log.info("Login OTP verified successfully for {}", user.getEmail());
     }
 }
-
