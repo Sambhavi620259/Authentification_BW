@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1.0")
+@RequestMapping("/api/v1/profile")   // ✅ FIXED
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -69,7 +69,7 @@ public class AuthController {
     }
 
     // ===============================
-    // DTOs
+    // DTOs (KEEP AS IS)
     // ===============================
     @Data
     public static class LoginRequest {

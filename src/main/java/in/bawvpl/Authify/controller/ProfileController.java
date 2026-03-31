@@ -8,16 +8,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1.0")
+@RequestMapping("/api/v1/profile")
 @RequiredArgsConstructor
 public class ProfileController {
 
     private final UserRepository userRepository;
 
-    @GetMapping("/profile")
+    @GetMapping
     public ProfileResponse getProfile(Authentication authentication) {
 
-        String email = authentication.getName(); // FROM JWT
+        String email = authentication.getName();
 
         UserEntity user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));

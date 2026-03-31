@@ -25,46 +25,32 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // ✅ CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // ✅ Disable CSRF for APIs
                 .csrf(csrf -> csrf.disable())
 
-                // ✅ Stateless (JWT)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // ✅ Authorization rules
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ allow OPTIONS (preflight)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ PUBLIC APIs (FIXED PATHS)
                         .requestMatchers(
                                 "/",
                                 "/error",
                                 "/favicon.ico",
 
-                                // 🔥 PROFILE APIs (MATCH YOUR CONTROLLER)
+                                // ✅ PUBLIC APIs
                                 "/api/v1/profile/register",
                                 "/api/v1/profile/login",
-                                "/api/v1/profile/verify-otp",
                                 "/api/v1/profile/send-otp",
-                                "/api/v1/profile/send-reset-otp",
-                                "/api/v1/profile/reset-password",
-
-                                // Swagger
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**"
+                                "/api/v1/profile/verify-otp",
+                                "/api/v1/profile/reset-password"
                         ).permitAll()
 
-                        // 🔐 everything else secured
                         .anyRequest().authenticated()
                 )
 
-                // ✅ JWT filter
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -80,7 +66,6 @@ public class SecurityConfig {
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
 
-        // expose Authorization header
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
