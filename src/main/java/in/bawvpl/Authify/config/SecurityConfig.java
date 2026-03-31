@@ -25,32 +25,39 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                // ✅ CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // ✅ Disable CSRF
                 .csrf(csrf -> csrf.disable())
 
+                // ✅ Stateless (JWT)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
+                // ✅ Authorization rules
                 .authorizeHttpRequests(auth -> auth
 
+                        // allow preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // public endpoints
                         .requestMatchers(
                                 "/",
                                 "/error",
                                 "/favicon.ico",
 
-                                // ✅ PUBLIC APIs
-                                "/api/v1/profile/register",
-                                "/api/v1/profile/login",
-                                "/api/v1/profile/send-otp",
-                                "/api/v1/profile/verify-otp",
-                                "/api/v1/profile/reset-password"
+                                // 🔥 AUTH APIs (MATCH YOUR CONTROLLER)
+                                "/api/v1.0/register",
+                                "/api/v1.0/login",
+                                "/api/v1.0/login/verify-otp"
                         ).permitAll()
 
+                        // everything else secured
                         .anyRequest().authenticated()
                 )
 
+                // ✅ JWT filter
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
