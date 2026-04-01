@@ -17,6 +17,11 @@ public class ProfileController {
     @GetMapping
     public ProfileResponse getProfile(Authentication authentication) {
 
+        // ✅ DEBUG SAFETY CHECK
+        if (authentication == null || authentication.getName() == null) {
+            throw new RuntimeException("Unauthorized - Authentication missing");
+        }
+
         String email = authentication.getName();
 
         UserEntity user = userRepository.findByEmail(email)

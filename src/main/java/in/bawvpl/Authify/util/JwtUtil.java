@@ -12,20 +12,17 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    // ✅ Read secret from application.properties
     @Value("${auth.jwt.secret}")
     private String secret;
 
-    // ✅ Expiration from properties
     @Value("${auth.jwt.expiration}")
     private long expiration;
 
-    // ✅ Generate signing key
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ✅ Generate token
+    // ✅ TOKEN GENERATION
     public String generateAccessToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
@@ -35,27 +32,29 @@ public class JwtUtil {
                 .compact();
     }
 
-    // ✅ Extract username (email)
+    // 🔥 ADD THIS (IMPORTANT FOR YOUR ERROR)
+    public String generateToken(String email) {
+        return generateAccessToken(email);
+    }
+
+    // ✅ EXTRACT USERNAME
     public String extractUsername(String token) {
         return extractClaims(token).getSubject();
     }
 
-    // ✅ Validate token
+    // ✅ VALIDATE TOKEN
     public boolean validateToken(String token, String username) {
         try {
-            return username.equals(extractUsername(token))
-                    && !isTokenExpired(token);
-        } catch (JwtException | IllegalArgumentException e) {
+            return username.equals(extractUsername(token)) && !isTokenExpired(token);
+        } catch (Exception e) {
             return false;
         }
     }
 
-    // ✅ Check expiration
     private boolean isTokenExpired(String token) {
         return extractClaims(token).getExpiration().before(new Date());
     }
 
-    // ✅ Extract claims
     private Claims extractClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
