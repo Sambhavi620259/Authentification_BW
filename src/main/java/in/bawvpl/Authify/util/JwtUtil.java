@@ -2,6 +2,7 @@ package in.bawvpl.Authify.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -11,29 +12,25 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    // ✅ Secret key (must be >= 32 chars for HS256)
-    private static final String SECRET =
-            "authify-super-secure-jwt-secret-key-256-bit-minimum";
+    // ✅ Read secret from application.properties
+    @Value("${auth.jwt.secret}")
+    private String secret;
 
-    // ✅ Token expiry (24 hours)
-    private static final long EXPIRATION_MS = 24 * 60 * 60 * 1000;
+    // ✅ Expiration from properties
+    @Value("${auth.jwt.expiration}")
+    private long expiration;
 
-    // ✅ Signing key
+    // ✅ Generate signing key
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ✅ MAIN METHOD (Fix for your error)
+    // ✅ Generate token
     public String generateAccessToken(String email) {
-        return generateToken(email);
-    }
-
-    // ✅ CORE TOKEN GENERATOR
-    public String generateToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -58,7 +55,7 @@ public class JwtUtil {
         return extractClaims(token).getExpiration().before(new Date());
     }
 
-    // ✅ Extract all claims (clean reusable method)
+    // ✅ Extract claims
     private Claims extractClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())

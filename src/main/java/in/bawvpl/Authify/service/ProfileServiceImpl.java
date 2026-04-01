@@ -114,8 +114,8 @@ public class ProfileServiceImpl implements ProfileService {
 
         userRepository.save(user);
 
-        // 🔥 RETURN JWT TOKEN
-        return jwtUtil.generateToken(user.getEmail());
+        // ✅ FIXED JWT METHOD
+        return jwtUtil.generateAccessToken(user.getEmail());
     }
 
     // ================= SEND VERIFICATION OTP =================
@@ -217,7 +217,7 @@ public class ProfileServiceImpl implements ProfileService {
                 .build();
     }
 
-    // ================= EXTRA METHODS =================
+    // ================= EXTRA =================
 
     @Override
     public String getLoggedInUserId(String email) {
