@@ -25,7 +25,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
 
-    // Public endpoints (no JWT required)
+    // ✅ Public APIs (no auth needed)
     private static final String[] PUBLIC_PATHS = {
             "/", "/error",
 
@@ -36,7 +36,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             "/api/v1.0/send-reset-otp",
             "/api/v1.0/reset-password",
 
-            // Swagger
             "/swagger-ui",
             "/swagger-ui/**",
             "/v3/api-docs",
@@ -48,7 +47,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Allow OPTIONS for CORS preflight
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -69,58 +67,69 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+        log.info("===== JWT FILTER START =====");
 
+        final String authHeader = request.getHeader("Authorization");
+        log.info("Authorization Header: {}", authHeader);
+
+        // ❌ No token → continue
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.warn("No Bearer token found");
             filterChain.doFilter(request, response);
             return;
         }
 
         String jwt = authHeader.substring(7);
+        log.info("JWT Token: {}", jwt);
 
         String username;
+
         try {
             username = jwtUtil.extractUsername(jwt);
+            log.info("Extracted Username: {}", username);
         } catch (Exception e) {
-            unauthorized(response, "Invalid token");
+            log.error("Invalid JWT token", e);
+            filterChain.doFilter(request, response);
             return;
         }
 
+        // ✅ Authenticate only if not already authenticated
         if (username != null &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
+            try {
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(username);
 
-            if (!jwtUtil.validateToken(jwt, userDetails.getUsername())) {
-                unauthorized(response, "Token expired or invalid");
-                return;
-            }
+                log.info("User loaded from DB: {}", userDetails.getUsername());
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
+                if (jwtUtil.validateToken(jwt, userDetails.getUsername())) {
+
+                    UsernamePasswordAuthenticationToken auth =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+
+                    auth.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
                     );
 
-            auth.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-            );
+                    SecurityContextHolder.getContext().setAuthentication(auth);
 
-            SecurityContextHolder.getContext().setAuthentication(auth);
+                    log.info("✅ Authentication set successfully");
+
+                } else {
+                    log.error("❌ Token validation failed");
+                }
+
+            } catch (Exception e) {
+                log.error("User not found or authentication error", e);
+            }
         }
 
+        // ✅ Continue request
         filterChain.doFilter(request, response);
-    }
-
-    private void unauthorized(HttpServletResponse response, String msg)
-            throws IOException {
-
-        response.setStatus(401);
-        response.setContentType("application/json");
-        response.getWriter().write(
-                "{ \"error\": \"Unauthorized\", \"message\": \"" + msg + "\" }"
-        );
     }
 }
