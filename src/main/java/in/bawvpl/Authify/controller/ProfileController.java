@@ -8,7 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1.0/profile")
+@RequestMapping("/api/v1.0/profile") // ✅ IMPORTANT
 @RequiredArgsConstructor
 public class ProfileController {
 
@@ -16,11 +16,6 @@ public class ProfileController {
 
     @GetMapping
     public ProfileResponse getProfile(Authentication authentication) {
-
-        // ✅ DEBUG SAFETY CHECK
-        if (authentication == null || authentication.getName() == null) {
-            throw new RuntimeException("Unauthorized - Authentication missing");
-        }
 
         String email = authentication.getName();
 

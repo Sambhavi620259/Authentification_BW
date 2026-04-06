@@ -10,9 +10,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.web.cors.*;
-
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -25,35 +22,34 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // ✅ CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // ✅ Disable CSRF
                 .csrf(csrf -> csrf.disable())
 
-                // ✅ Stateless (JWT)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // ✅ Authorization rules
                 .authorizeHttpRequests(auth -> auth
 
-                        // allow preflight
+                        // ✅ Allow preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // public endpoints
+                        // ✅ PUBLIC APIs
                         .requestMatchers(
                                 "/",
                                 "/error",
-                                "/favicon.ico",
-
-                                // 🔥 AUTH APIs (MATCH YOUR CONTROLLER)
                                 "/api/v1.0/register",
                                 "/api/v1.0/login",
-                                "/api/v1.0/login/verify-otp"
+                                "/api/v1.0/login/verify-otp",
+                                "/api/v1.0/send-otp",
+                                "/api/v1.0/send-reset-otp",
+                                "/api/v1.0/reset-password",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
                         ).permitAll()
 
-                        // everything else secured
+                        // ✅ SECURED APIs
+                        .requestMatchers("/api/v1.0/profile").authenticated()
+
+                        // 🔒 everything else secured
                         .anyRequest().authenticated()
                 )
 
@@ -61,23 +57,5 @@ public class SecurityConfig {
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-
-        CorsConfiguration config = new CorsConfiguration();
-
-        config.setAllowedOrigins(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(false);
-
-        config.setExposedHeaders(List.of("Authorization"));
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        return source;
     }
 }

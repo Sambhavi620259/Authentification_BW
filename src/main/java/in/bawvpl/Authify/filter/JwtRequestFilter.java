@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 @Component
 @RequiredArgsConstructor
@@ -25,21 +26,19 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
 
-    // ✅ Public APIs (no auth needed)
     private static final String[] PUBLIC_PATHS = {
-            "/", "/error",
-
+            "/",
+            "/error",
             "/api/v1.0/register",
             "/api/v1.0/login",
             "/api/v1.0/login/verify-otp",
             "/api/v1.0/send-otp",
             "/api/v1.0/send-reset-otp",
             "/api/v1.0/reset-password",
-
             "/swagger-ui",
-            "/swagger-ui/**",
+            "/swagger-ui/",
             "/v3/api-docs",
-            "/v3/api-docs/**"
+            "/v3/api-docs/"
     };
 
     @Override
@@ -47,17 +46,13 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
+        // ✅ allow OPTIONS
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
 
-        for (String publicPath : PUBLIC_PATHS) {
-            if (path.startsWith(publicPath)) {
-                return true;
-            }
-        }
-
-        return false;
+        return Arrays.stream(PUBLIC_PATHS)
+                .anyMatch(p -> path.equals(p) || path.startsWith(p + "/"));
     }
 
     @Override
@@ -67,69 +62,47 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        log.info("===== JWT FILTER START =====");
-
         final String authHeader = request.getHeader("Authorization");
-        log.info("Authorization Header: {}", authHeader);
 
-        // ❌ No token → continue
+        // ✅ No token → continue (important!)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.warn("No Bearer token found");
             filterChain.doFilter(request, response);
             return;
         }
 
         String jwt = authHeader.substring(7);
-        log.info("JWT Token: {}", jwt);
-
         String username;
 
         try {
             username = jwtUtil.extractUsername(jwt);
-            log.info("Extracted Username: {}", username);
         } catch (Exception e) {
-            log.error("Invalid JWT token", e);
             filterChain.doFilter(request, response);
             return;
         }
 
-        // ✅ Authenticate only if not already authenticated
         if (username != null &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            try {
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(username);
+            UserDetails userDetails =
+                    userDetailsService.loadUserByUsername(username);
 
-                log.info("User loaded from DB: {}", userDetails.getUsername());
+            if (jwtUtil.validateToken(jwt, userDetails.getUsername())) {
 
-                if (jwtUtil.validateToken(jwt, userDetails.getUsername())) {
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
 
-                    UsernamePasswordAuthenticationToken auth =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
+                auth.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
 
-                    auth.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-
-                    log.info("✅ Authentication set successfully");
-
-                } else {
-                    log.error("❌ Token validation failed");
-                }
-
-            } catch (Exception e) {
-                log.error("User not found or authentication error", e);
+                SecurityContextHolder.getContext().setAuthentication(auth);
             }
         }
 
-        // ✅ Continue request
         filterChain.doFilter(request, response);
     }
 }
